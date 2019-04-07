@@ -1,18 +1,14 @@
-FROM debian
+FROM alpine
 
-WORKDIR /usr/src
+WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y \
-        perl \
-        libwww-mechanize-perl \
-        libhtml-tableextract-perl \
-        libyaml-perl \
-        liblist-moreutils-perl \
-        libfile-slurp-perl \
-        libmime-lite-perl \
-    && rm -rf /var/lib/apt/lists
+RUN apk add --no-cache python3
 
-COPY craigslist-renew.pl /usr/src
+COPY requirements.txt .
+RUN pip3 install -r requirements.txt --no-cache-dir
 
-ENTRYPOINT [ "/usr/bin/perl", "./craigslist-renew.pl", "/tmp/craigslist-renew.yml"]
+COPY craigslist-renew.py .
+
+VOLUME /data
+
+ENTRYPOINT ["python3", "craigslist-renew.py", "/data/config.yml"]
