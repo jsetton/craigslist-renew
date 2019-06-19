@@ -12,6 +12,7 @@ import sys
 from argparse import ArgumentParser, FileType
 from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
+from fake_useragent import UserAgent
 from mechanize import Browser, LinkNotFoundError
 from smtplib import SMTP
 from subprocess import Popen, PIPE
@@ -132,6 +133,7 @@ def notify(message, subject=description, level='info', sendmail=True):
 def login():
     # open login url
     browser.set_handle_robots(False)
+    browser.addheaders = [('User-agent', UserAgent().random)]
     browser.open(url)
 
     # submit login credentials form
