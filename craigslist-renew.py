@@ -63,7 +63,6 @@ def renew_posts():
     for page in range(1, 6):
         # look for all listings with a renew button
         for nr, form in enumerate(browser.forms()):
-            renewed = False
             for control in form.controls:
                 if control.type == 'submit' and control.name == 'go' and control.value == 'renew':
                     # fetch posting link
@@ -78,7 +77,9 @@ def renew_posts():
                                  browser.response().read().decode('utf-8')):
                         notify('Renewed "{}" ({})'.format(link.text, link.url),
                                sendmail=not config.get('no_success_mail'))
-                        renewed = True
+                        # only renew the first posting unless config renew_all setting enabled
+                        if not config.get('renew_all'):
+                            return
                     else:
                         notify('Could not renew post - {}'.format(form.action),
                                level='error')
@@ -86,10 +87,6 @@ def renew_posts():
                     # return to previous page
                     browser.back()
                     break
-
-            # only renew the first posting unless renew_all is specified
-            if renewed and not config.get('renew_all'):
-                return
 
         # go to next page if link found
         try:
