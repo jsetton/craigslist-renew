@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 from fake_useragent import UserAgent
 from mechanize import Browser, LinkNotFoundError
+from random import shuffle
 from smtplib import SMTP
 from subprocess import Popen, PIPE
 from yaml import safe_load
@@ -128,9 +129,17 @@ def notify(message, subject=description, level='info', sendmail=True):
 
 # login and get active posts
 def login():
+    # define shuffle request headers order callback function
+    def shuffle_headers(request, headers):
+        items = list(headers.items())
+        shuffle(items)
+        for key, _ in items:
+            headers.move_to_end(key)
+
     # open login url
     browser.set_handle_robots(False)
-    browser.addheaders = [('User-agent', UserAgent().random)]
+    browser.addheaders = [('User-Agent', UserAgent().random)]
+    browser.finalize_request_headers = shuffle_headers
     browser.open(url)
 
     # submit login credentials form
