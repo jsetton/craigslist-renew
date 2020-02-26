@@ -1,4 +1,4 @@
-beautifulsoup4==4.6.3
+beautifulsoup4==4.8.2
 fake-useragent==0.1.11
-mechanize==0.4.1
-PyYAML==5.1
+mechanize==0.4.5
+PyYAML==5.3
