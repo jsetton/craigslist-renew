@@ -131,9 +131,9 @@ def notify(message, subject=description, level='info', sendmail=True):
 def login():
     # define shuffle request headers order callback function
     def shuffle_headers(request, headers):
-        items = list(headers.items())
-        shuffle(items)
-        for key, _ in items:
+        keys = list(headers.keys())
+        shuffle(keys)
+        for key in keys:
             headers.move_to_end(key)
 
     # open login url
