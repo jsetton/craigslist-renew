@@ -2,10 +2,10 @@ FROM alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache python3
+RUN apk add --no-cache python3 py3-pip py3-wheel
 
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt --no-cache-dir
+RUN pip install -r requirements.txt --no-cache-dir
 
 COPY craigslist-renew.py .
 
