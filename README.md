@@ -7,8 +7,9 @@ This is a simple python script that will auto-renew all your active Craigslist p
 This project depends on the following python modules:
 
 * `beautifulsoup4`
-* `mechanize`
+* `html5lib`
 * `PyYAML`
+* `selenium`
 
 Use the python package manager to install them:
 
@@ -44,6 +45,8 @@ no_success_mail: <1|0>
 renew_all: <1|0>
 # specify path for logging actions taken
 logfile: <path-to-logfile>
+# specify selenium webdriver local path or remote url (defaults to using chromedriver in local path if omitted)
+webdriver: <path-to-webdriver>
 # specify the list of your current postings for expiration notifications
 postings:
   - title: My post
@@ -68,8 +71,16 @@ To avoid installing a python environment with all its dependencies you can run t
 
 ### Build image
 
+By default, the chromedriver package is included as local webdriver. If you rather use a [Selenium Grid](https://www.selenium.dev/docs/site/en/grid/) server instead, that package can be excluded using the `LOCAL_WEBDRIVER` docker build argument. If going with the latter, make sure to specify the remote url in the config file.
+
+#### Local webdriver support build (Default)
 ```
 docker build -t craigslist-renew .
+```
+
+#### Remote webdriver support build
+```
+docker build -t craigslist-renew --build-arg LOCAL_WEBDRIVER=no .
 ```
 
 ### Run commands
