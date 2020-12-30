@@ -1,8 +1,11 @@
-FROM alpine
+FROM python:3-alpine
+
+ARG LOCAL_WEBDRIVER=yes
 
 WORKDIR /app
 
-RUN apk add --no-cache python3 py3-pip py3-wheel
+RUN if [[ "$LOCAL_WEBDRIVER" = "yes" ]]; then \
+  apk add --no-cache chromium chromium-chromedriver; fi
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt --no-cache-dir
