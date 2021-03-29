@@ -161,6 +161,14 @@ def login():
     except NoSuchElementException:
         return
 
+# logout to avoid dangling sessions
+def logout():
+    try:
+        driver.find_element_by_link_text('log out').click()
+    except NoSuchElementException:
+        return
+
+
 # initialize logging
 def init_logging():
     handlers = []
@@ -234,6 +242,9 @@ if __name__ == '__main__':
             check_expired()
         else:
             renew_posts()
+
+        # Log out to avoid dangling sessions.
+        logout()
 
     except KeyError as e:
         log.error('Parameter {} not defined in config file'.format(e))
