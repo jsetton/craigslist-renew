@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: craigslist-renew
+spec:
+  schedule: "4 8 1-31/2 * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: craigslist-renew
+              image: jsetton/craigslist-renew:latest
+              imagePullPolicy: IfNotPresent
+              command: ["python3", "craigslist-renew.py", "/data/config.yml"]
+              volumeMounts:
+                - name: config-volume
+                  mountPath: /data/config.yml
+                  subPath: config.yml
+          volumes:
+            - name: config-volume
+              configMap:
+                name: craigslist-renew-config
+          restartPolicy: Never
+      backoffLimit: 4
