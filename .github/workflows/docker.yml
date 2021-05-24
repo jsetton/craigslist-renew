@@ -1,0 +1,42 @@
+name: docker
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  docker:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - build-args: LOCAL_WEBDRIVER=yes
+            tags: local
+            latest: true
+          - build-args: LOCAL_WEBDRIVER=no
+            tags: remote
+            latest: false
+
+    steps:
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ${{ github.repository }}
+          tags: ${{ matrix.tags }}
+          flavor: latest=${{ matrix.latest }}
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          build-args: ${{ matrix.build-args }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

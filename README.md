@@ -20,7 +20,7 @@ pip3 install -r requirements.txt
 ## Usage
 
 Create a yaml config file with the following content:
-```
+```yaml
 ---
 #
 # Required parameters
@@ -56,43 +56,38 @@ postings:
 ```
 
 Then just schedule the script in cron to run at the schedule you want. Depending on the category and location, craigslist posts can be renewed about once every few days, so running the script every few hours should be more than sufficient:
-```
+```cron
 0 */2 * * * /path/to/craigslist-renew.py /path/to/config.yml
 ```
 
 You can only renew a post so many times before it expires, so to get notified about expired posts, make sure you have configured the `postings` parameter in your configuration and add the following (daily) cronjob:
-```
+```cron
 0 21 * * * /path/to/craigslist-renew.py --expired /path/to/config.yml
 ```
 
-## Docker
+## Docker Image
 
-To avoid installing a python environment with all its dependencies you can run this script in a Docker container.
+[![dockeri.co](https://dockeri.co/image/jsetton/craigslist-renew)](https://hub.docker.com/r/jsetton/craigslist-renew).
 
-### Build image
+### Supported tags
 
-By default, the chromedriver package is included as local webdriver. If you rather use a [Selenium Grid](https://www.selenium.dev/docs/site/en/grid/) server instead, that package can be excluded using the `LOCAL_WEBDRIVER` docker build argument. If going with the latter, make sure to specify the remote url in the config file.
+By default, the chromedriver package is included as local webdriver. If you rather use a [Selenium Grid](https://www.selenium.dev/docs/site/en/grid/) server instead, use the `remote` tag. If going with the latter, make sure to specify the remote url in the config file.
 
-#### Local webdriver support build (Default)
-```
-docker build -t craigslist-renew .
-```
-
-#### Remote webdriver support build
-```
-docker build -t craigslist-renew --build-arg LOCAL_WEBDRIVER=no .
-```
+| Tags | Description |
+| :----: | --- |
+| `latest`, `local` | Local webdriver support |
+| `remote` | Remote webdriver support |
 
 ### Run commands
 
-Make sure that the configuration file `config.xml` is in the directory you are running the commands below or specify the proper directory path in the volume parameter. The log file path should be set to `/data/<logfile>` in the configuration file, if specified.
+Make sure that the configuration file `config.yml` is in the directory you are running the commands below or specify the proper directory path in the volume parameter. The log file path should be set to `/data/<logfile>` in the configuration file, if specified.
 
 #### Renew posts
-```
-docker run --rm -v $(pwd):/data craigslist-renew
+```bash
+docker run --rm -v $(pwd):/data jsetton/craigslist-renew
 ```
 
 #### Check expired posts
-```
-docker run --rm -v $(pwd):/data craigslist-renew --expired
+```bash
+docker run --rm -v $(pwd):/data jsetton/craigslist-renew --expired
 ```
