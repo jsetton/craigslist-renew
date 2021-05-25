@@ -73,10 +73,10 @@ You can only renew a post so many times before it expires, so to get notified ab
 
 By default, the chromedriver package is included as local webdriver. If you rather use a [Selenium Grid](https://www.selenium.dev/docs/site/en/grid/) server instead, use the `remote` tag. If going with the latter, make sure to specify the remote url in the config file.
 
-| Tags | Description |
-| :----: | --- |
-| `latest`, `local` | Local webdriver support |
-| `remote` | Remote webdriver support |
+|       Tags        | Description              |
+| :---------------: | ------------------------ |
+| `latest`, `local` | Local webdriver support  |
+|     `remote`      | Remote webdriver support |
 
 ### Run commands
 
@@ -90,4 +90,22 @@ docker run --rm -v $(pwd):/data jsetton/craigslist-renew
 #### Check expired posts
 ```bash
 docker run --rm -v $(pwd):/data jsetton/craigslist-renew --expired
+```
+
+## Kubernetes CronJob
+
+To deploy this script as a [Kubernetes CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/)
+
+### Create ConfMap
+
+``` bash
+kubectl create configmap craigslist-renew-config --from-file=config.yml
+```
+
+### Apply the Job
+
+Adjust `kubernetes/cronjob.yaml` cron schedule, defaults to every odd day.
+
+``` bash
+kubectl apply -f kubernetes/cronjob.yaml
 ```
