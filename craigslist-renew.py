@@ -41,7 +41,7 @@ def check_expired():
         cells = map(lambda cell: re.sub(r'\s+', ' ', cell.text.strip()), row.find_all('td'))
         info = dict(zip(headers, cells))
 
-        if info['status'] == 'Active':
+        if 'Active' in info['status']:
             for posting in config.get('postings', []):
                 # mark this posting as active if it matches one of the configured postings
                 title = re.compile(re.escape(posting.get('title')), flags=re.I)
