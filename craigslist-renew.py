@@ -13,9 +13,9 @@ from argparse import ArgumentParser, FileType
 from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 from fake_useragent import UserAgent
-from random import shuffle
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
 from smtplib import SMTP
 from subprocess import Popen, PIPE
 from yaml import safe_load
@@ -65,11 +65,11 @@ def renew_posts():
         while True:
             try:
                 # find next renew button element
-                button = driver.find_element_by_xpath('//input[@type="submit" and @value="renew"]')
+                button = driver.find_element(By.XPATH, '//input[@type="submit" and @value="renew"]')
                 # fetch posting link
-                form_action = button.find_element_by_xpath('..').get_attribute('action')
+                form_action = button.find_element(By.XPATH, '..').get_attribute('action')
                 post_id = form_action.split('/')[-1]
-                link = driver.find_element_by_xpath('//a[contains(@href, "/{}.html")]'.format(post_id))
+                link = driver.find_element(By.XPATH, '//a[contains(@href, "/{}.html")]'.format(post_id))
                 title = link.text
                 url = link.get_attribute('href')
                 # click the renew button
@@ -96,14 +96,14 @@ def renew_posts():
 
         # go to next page if link found
         try:
-            driver.find_element_by_xpath('//a[contains(@href, "filter_page={}")]'.format(page + 1)).click()
+            driver.find_element(By.XPATH, '//a[contains(@href, "filter_page={}")]'.format(page + 1)).click()
         except NoSuchElementException:
             return
 
 # determine if posting has been renewed
 def has_posting_renewed():
     try:
-        driver.find_element_by_xpath('//*[contains(text(), "This posting has been renewed")]')
+        driver.find_element(By.XPATH, '//*[contains(text(), "This posting has been renewed")]')
         return True
     except NoSuchElementException:
         return False
@@ -146,9 +146,9 @@ def login():
         # open login url
         driver.get(url)
         # submit login credentials form
-        driver.find_element_by_xpath('//*[@id="inputEmailHandle"]').send_keys(config['email'])
-        driver.find_element_by_xpath('//*[@id="inputPassword"]').send_keys(config['password'])
-        driver.find_element_by_xpath('//*[@id="login"]').click()
+        driver.find_element(By.XPATH, '//*[@id="inputEmailHandle"]').send_keys(config['email'])
+        driver.find_element(By.XPATH, '//*[@id="inputPassword"]').send_keys(config['password'])
+        driver.find_element(By.XPATH, '//*[@id="login"]').click()
 
         # exit if login failed
         if driver.current_url != '{}/home'.format(url):
@@ -156,7 +156,7 @@ def login():
             sys.exit(1)
 
         # filter active posts only
-        driver.find_element_by_xpath('//button[@class="filterbtn" and @value="active"]').click()
+        driver.find_element(By.XPATH, '//button[@class="filterbtn" and @value="active"]').click()
 
     except NoSuchElementException:
         return
@@ -164,10 +164,9 @@ def login():
 # logout to avoid dangling sessions
 def logout():
     try:
-        driver.find_element_by_link_text('log out').click()
+        driver.find_element(By.LINK_TEXT, 'log out').click()
     except NoSuchElementException:
         return
-
 
 # initialize logging
 def init_logging():
@@ -184,7 +183,7 @@ def init_logging():
         level=logging.INFO,
         handlers=handlers)
 
-# initialize webdriver
+# initialize webdriver session
 def init_webdriver():
     options = webdriver.ChromeOptions()
     options.add_argument('headless')
@@ -205,7 +204,7 @@ def init_webdriver():
     else:
         driver = webdriver.Remote(
             command_executor=config['webdriver'],
-            desired_capabilities=options.to_capabilities()
+            options=options
         )
 
     # set driver wait limit to 5 seconds
@@ -226,11 +225,11 @@ def parse_args():
 if __name__ == '__main__':
     global config, driver
     try:
-        # parse command arguments
+        # parse command line arguments
         args = parse_args()
         # load config file
         config = safe_load(args.config)
-        # initialize webdriver
+        # initialize webdriver session
         driver = init_webdriver()
         # initialize logging
         init_logging()
@@ -243,8 +242,10 @@ if __name__ == '__main__':
         else:
             renew_posts()
 
-        # Log out to avoid dangling sessions.
+        # log out to avoid dangling sessions
         logout()
+        # terminate webdriver session
+        driver.quit()
 
     except KeyError as e:
         log.error('Parameter {} not defined in config file'.format(e))
