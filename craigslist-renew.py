@@ -53,10 +53,10 @@ def check_expired():
 
     for posting in config.get('postings', []):
         if not posting.get('active'):
-            expired.append('{} ({})'.format(posting.get('title'), posting.get('area')))
+            expired.append(f'{posting.get("title")} ({posting.get("area")})')
 
     if expired:
-        notify('The following posts have expired:\n\n{}'.format('\n'.join(expired)),
+        notify(f'The following posts have expired:\n\n{chr(10).join(expired)}',
                subject='Craigslist post expired')
 
 # renew posts
