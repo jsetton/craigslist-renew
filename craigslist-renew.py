@@ -38,17 +38,18 @@ def check_expired():
     headers = ['status', 'manage', 'title', 'area', 'date', 'id']
     expired = []
 
-    for row in table.find('tbody').find_all('tr'):
-        cells = map(lambda cell: re.sub(r'\s+', ' ', cell.text.strip()), row.find_all('td'))
-        info = dict(zip(headers, cells))
+    if table:
+        for row in table.find('tbody').find_all('tr'):
+            cells = map(lambda cell: re.sub(r'\s+', ' ', cell.text.strip()), row.find_all('td'))
+            info = dict(zip(headers, cells))
 
-        if 'Active' in info['status']:
-            for posting in config.get('postings', []):
-                # mark this posting as active if it matches one of the configured postings
-                title = re.compile(re.escape(posting.get('title')), flags=re.I)
-                area  = re.compile(posting.get('area', ''), flags=re.I)
-                if title.search(info['title']) and area.search(info['area']):
-                    posting['active'] = True
+            if 'Active' in info['status']:
+                for posting in config.get('postings', []):
+                    # mark this posting as active if it matches one of the configured postings
+                    title = re.compile(re.escape(posting.get('title')), flags=re.I)
+                    area  = re.compile(posting.get('area', ''), flags=re.I)
+                    if title.search(info['title']) and area.search(info['area']):
+                        posting['active'] = True
 
     for posting in config.get('postings', []):
         if not posting.get('active'):
@@ -70,7 +71,7 @@ def renew_posts():
                 # fetch posting link
                 form_action = button.find_element(By.XPATH, '..').get_attribute('action')
                 post_id = form_action.split('/')[-1]
-                link = driver.find_element(By.XPATH, '//a[contains(@href, "/{}.html")]'.format(post_id))
+                link = driver.find_element(By.XPATH, f'//a[contains(@href, "/{post_id}.html")]')
                 title = link.text
                 url = link.get_attribute('href')
                 # click the renew button
@@ -78,14 +79,12 @@ def renew_posts():
 
                 # check posting has been renewed
                 if has_posting_renewed():
-                    notify('Renewed "{}" ({})'.format(title, url),
-                           sendmail=not config.get('no_success_mail'))
+                    notify(f'Renewed "{title}" ({url})', sendmail=not config.get('no_success_mail'))
                     # only renew the first posting unless config renew_all setting enabled
                     if not config.get('renew_all'):
                         return
                 else:
-                    notify('Could not renew post - {}'.format(form_action),
-                           level='error')
+                    notify(f'Could not renew post - {form_action}', level='error')
                     return
 
                 # return to previous refreshed page
@@ -97,9 +96,9 @@ def renew_posts():
 
         # go to next page if link found
         try:
-            driver.find_element(By.XPATH, '//a[contains(@href, "filter_page={}")]'.format(page + 1)).click()
+            driver.find_element(By.XPATH, f'//a[contains(@href, "filter_page={page + 1}")]').click()
         except NoSuchElementException:
-            return
+            break
 
 # determine if posting has been renewed
 def has_posting_renewed():
@@ -112,7 +111,7 @@ def has_posting_renewed():
 # print message in interactive mode or send email when run from cron
 def notify(message, subject=description, level='info', sendmail=True):
     # log message
-    getattr(log, level)('{}: {}'.format(config['email'], message))
+    getattr(log, level)(f'{config["email"]}: {message}')
 
     # send mail if sendmail parameter is true and config notify settings defined
     if sendmail and config.get('notify'):
@@ -152,7 +151,7 @@ def login():
         driver.find_element(By.XPATH, '//*[@id="login"]').click()
 
         # exit if login failed
-        if driver.current_url != '{}/home'.format(url):
+        if driver.current_url != f'{url}/home':
             notify('Login failed', level='error')
             sys.exit(1)
 
@@ -160,14 +159,14 @@ def login():
         driver.find_element(By.XPATH, '//button[@class="filterbtn" and @value="active"]').click()
 
     except NoSuchElementException:
-        return
+        pass
 
 # logout to avoid dangling sessions
 def logout():
     try:
         driver.find_element(By.LINK_TEXT, 'log out').click()
     except NoSuchElementException:
-        return
+        pass
 
 # initialize logging
 def init_logging():
@@ -191,7 +190,7 @@ def init_webdriver():
     options.add_argument('disable-extensions')
     options.add_argument('no-sandbox')
     options.add_argument('window-size=1920,1080')
-    options.add_argument('user-agent={}'.format(UserAgent().chrome))
+    options.add_argument(f'user-agent={UserAgent().chrome}')
 
     if not config.get('webdriver'):
         driver = webdriver.Chrome(
@@ -252,8 +251,8 @@ if __name__ == '__main__':
             renew_posts()
 
     except KeyError as e:
-        log.error('Parameter {} not defined in config file'.format(e))
+        log.error(f'Parameter {e} not defined in config file')
         sys.exit(1)
     except Exception as e:
-        log.error('Something went wrong: {}'.format(e))
+        log.error(f'Something went wrong: {e}')
         sys.exit(1)
