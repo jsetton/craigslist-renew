@@ -6,6 +6,7 @@
 # password: <craigslist password>
 # notify: <comma separated list of emails>
 
+import atexit
 import logging
 import re
 import sys
@@ -221,6 +222,14 @@ def parse_args():
         'config', type=FileType('r'), help='config file')
     return parser.parse_args()
 
+# cleanup session upon exit
+@atexit.register
+def cleanup_session():
+    if driver:
+        # log out to avoid dangling sessions
+        logout()
+        # terminate webdriver session
+        driver.quit()
 
 if __name__ == '__main__':
     global config, driver
@@ -241,11 +250,6 @@ if __name__ == '__main__':
             check_expired()
         else:
             renew_posts()
-
-        # log out to avoid dangling sessions
-        logout()
-        # terminate webdriver session
-        driver.quit()
 
     except KeyError as e:
         log.error('Parameter {} not defined in config file'.format(e))
