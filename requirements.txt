@@ -1,5 +1,5 @@
-beautifulsoup4==4.11.1
-fake-useragent==1.1.1
+beautifulsoup4==4.12.2
+fake-useragent==1.2.1
 html5lib==1.1
-PyYAML==6.0
-selenium==4.7.2
+PyYAML==6.0.1
+selenium==4.11.2
