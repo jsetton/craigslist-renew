@@ -224,11 +224,14 @@ def parse_args():
 # cleanup session upon exit
 @atexit.register
 def cleanup_session():
-    if driver:
-        # log out to avoid dangling sessions
-        logout()
-        # terminate webdriver session
-        driver.quit()
+    try:
+        if driver:
+            # log out to avoid dangling sessions
+            logout()
+            # terminate webdriver session
+            driver.quit()
+    except NameError:
+        pass
 
 if __name__ == '__main__':
     global config, driver
