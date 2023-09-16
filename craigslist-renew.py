@@ -9,6 +9,7 @@
 import atexit
 import logging
 import re
+import shutil
 import sys
 from argparse import ArgumentParser, FileType
 from bs4 import BeautifulSoup
@@ -193,12 +194,19 @@ def init_webdriver():
     options.add_argument(f'user-agent={UserAgent().chrome}')
 
     if not config.get('webdriver'):
+        service = webdriver.ChromeService(
+            executable_path=shutil.which('chromedriver')
+        )
         driver = webdriver.Chrome(
+            service=service,
             options=options
         )
     elif not config['webdriver'].startswith('http'):
+        service = webdriver.ChromeService(
+            executable_path=config['webdriver']
+        )
         driver = webdriver.Chrome(
-            executable_path=config['webdriver'],
+            service=service,
             options=options
         )
     else:
