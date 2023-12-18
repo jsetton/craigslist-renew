@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 from fake_useragent import UserAgent
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import InvalidSessionIdException, NoSuchElementException, WebDriverException
 from selenium.webdriver.common.by import By
 from smtplib import SMTP
 from subprocess import Popen, PIPE
@@ -58,17 +58,15 @@ def check_expired():
 
     if expired:
         notify(f'The following posts have expired:\n\n{chr(10).join(expired)}',
-               subject='Craigslist post expired')
+               subject='Craigslist Expired Posts')
 
 # renew posts
 def renew_posts():
     # loop thru up to 5 pages
     for page in range(1, 6):
-        # look for all listings with a renew button
-        while True:
+        # loop thru renew buttons
+        for button in driver.find_elements(By.XPATH, '//input[@type="submit" and @value="renew"]'):
             try:
-                # find next renew button element
-                button = driver.find_element(By.XPATH, '//input[@type="submit" and @value="renew"]')
                 # fetch posting link
                 form_action = button.find_element(By.XPATH, '..').get_attribute('action')
                 post_id = form_action.split('/')[-1]
@@ -93,7 +91,7 @@ def renew_posts():
                 driver.refresh()
 
             except NoSuchElementException:
-                break
+                continue
 
         # go to next page if link found
         try:
@@ -153,20 +151,21 @@ def login():
 
         # exit if login failed
         if driver.current_url != f'{url}/home':
-            notify('Login failed', level='error')
-            sys.exit(1)
+            sys.exit('Login failed')
 
         # filter active posts only
         driver.find_element(By.XPATH, '//button[@class="filterbtn" and @value="active"]').click()
 
     except NoSuchElementException:
-        pass
+        sys.exit('Unexpected login page format')
+    except WebDriverException:
+        sys.exit('Could not open login page')
 
 # logout to avoid dangling sessions
 def logout():
     try:
         driver.find_element(By.LINK_TEXT, 'log out').click()
-    except NoSuchElementException:
+    except (InvalidSessionIdException, NoSuchElementException):
         pass
 
 # initialize logging
@@ -234,15 +233,15 @@ def parse_args():
 @atexit.register
 def cleanup_session():
     try:
-        if driver:
-            # log out to avoid dangling sessions
-            logout()
-            # terminate webdriver session
-            driver.quit()
+        # log out to avoid dangling sessions
+        logout()
+        # terminate webdriver session
+        driver.quit()
     except NameError:
         pass
 
-if __name__ == '__main__':
+# main
+def main():
     global config, driver
     try:
         # parse command line arguments
@@ -263,8 +262,16 @@ if __name__ == '__main__':
             renew_posts()
 
     except KeyError as e:
-        log.error(f'Parameter {e} not defined in config file')
-        sys.exit(1)
+        sys.exit(f'Parameter {e} not defined in config file')
     except Exception as e:
-        log.error(f'Something went wrong: {e}')
+        log.error(f'Unexpected error: {e}')
+        sys.exit('Something went wrong. Please check the logs.')
+
+if __name__ == '__main__':
+    try:
+        main()
+    except SystemExit as e:
+        if not isinstance(e.code, str):
+            raise
+        notify(e.code, level='error')
         sys.exit(1)
