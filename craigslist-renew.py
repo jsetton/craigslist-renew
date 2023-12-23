@@ -64,9 +64,11 @@ def check_expired():
 def renew_posts():
     # loop thru up to 5 pages
     for page in range(1, 6):
-        # loop thru renew buttons
-        for button in driver.find_elements(By.XPATH, '//input[@type="submit" and @value="renew"]'):
+        # look for all listings with a renew button
+        while True:
             try:
+                # find next renew button element
+                button = driver.find_element(By.XPATH, '//input[@type="submit" and @value="renew"]')
                 # fetch posting link
                 form_action = button.find_element(By.XPATH, '..').get_attribute('action')
                 post_id = form_action.split('/')[-1]
@@ -91,7 +93,7 @@ def renew_posts():
                 driver.refresh()
 
             except NoSuchElementException:
-                continue
+                break
 
         # go to next page if link found
         try:
