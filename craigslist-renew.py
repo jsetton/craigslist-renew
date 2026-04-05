@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # This script logs in to your craigslist account and renews all posts that can be renewed
 # The script should be invoked with a config file in yaml format containing the following info:
 # ---

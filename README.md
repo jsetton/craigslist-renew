@@ -72,7 +72,15 @@ You can only renew a post so many times before it expires, so to get notified ab
 | :---: | --- |
 | `latest` | Latest stable release |
 
-> **Note:** The `local` and `remote` tags are no longer supported. Please use `latest` instead.
+> The `local` and `remote` tags are no longer supported. Please use `latest` instead.
+
+### Environment Variables
+| Variable | Default | Description |
+| :---: | :---: | --- |
+| `PUID` | Auto-detected from `/data` | User ID to run the script as |
+| `PGID` | Auto-detected from `/data` | Group ID to run the script as |
+
+> By default, the container will automatically match the ownership of your data directory. If the ownership cannot be determined, it will fall back to `1000:1000`. You can override this behavior by setting `PUID` and `PGID` explicitly. Note that running as root (`PUID=0` or `PGID=0`) is not supported.
 
 ### Run commands
 
