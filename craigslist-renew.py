@@ -6,274 +6,291 @@
 # password: <craigslist password>
 # notify: <comma separated list of emails>
 
-import atexit
+
+import asyncio
 import logging
 import re
-import shutil
 import sys
-from argparse import ArgumentParser, FileType
-from bs4 import BeautifulSoup
-from email.mime.text import MIMEText
-from fake_useragent import UserAgent
-from selenium import webdriver
-from selenium.common.exceptions import InvalidSessionIdException, NoSuchElementException, WebDriverException
-from selenium.webdriver.common.by import By
-from smtplib import SMTP
-from subprocess import Popen, PIPE
-from yaml import safe_load
+from argparse import ArgumentParser, FileType, Namespace
+from email.message import EmailMessage
+from typing import Any, Literal
 
-description = 'Craigslist Automatic Renewal'
-url = 'https://accounts.craigslist.org/login'
-#
+import aiosmtplib
+import zendriver as zd
+from bs4 import BeautifulSoup
+from fake_useragent import UserAgent
+from yaml import safe_load, YAMLError
+from zendriver import Browser, Tab
+from zendriver.core.connection import ProtocolException
+
+APP_DESCRIPTION = "Craigslist Automatic Renewal"
+CRAIGSLIST_LOGIN_URL = "https://accounts.craigslist.org/login"
+
 log = logging.getLogger(__name__)
 
-# the config file can list postings that should currently be active. This is specified in the config as:
-# postings:
-#   - title: My Posting
-#     area: nyc
-#   - title: Another posting
-#     area: nyc
-def check_expired():
-    soup = BeautifulSoup(driver.page_source, 'html5lib')
-    table = soup.find('table', attrs={'class': 'accthp_postings'})
-    headers = ['status', 'manage', 'title', 'area', 'date', 'id']
-    expired = []
+config: dict[str, Any] = {}
+browser: Browser | None = None
+tab: Tab | None = None
+
+
+async def check_expired() -> None:
+    content = await tab.get_content()
+    soup = BeautifulSoup(content, "html.parser")
+    table = soup.find("table", attrs={"class": "accthp_postings"})
+    headers = ["status", "manage", "title", "area", "date", "id"]
+    expired: list[str] = []
 
     if table:
-        for row in table.find('tbody').find_all('tr'):
-            cells = map(lambda cell: re.sub(r'\s+', ' ', cell.text.strip()), row.find_all('td'))
+        for row in table.find("tbody").find_all("tr"):
+            cells = map(
+                lambda cell: re.sub(r"\s+", " ", cell.text.strip()), row.find_all("td")
+            )
             info = dict(zip(headers, cells))
 
-            if 'Active' in info['status']:
-                for posting in config.get('postings', []):
-                    # mark this posting as active if it matches one of the configured postings
-                    title = re.compile(re.escape(posting.get('title')), flags=re.I)
-                    area  = re.compile(posting.get('area', ''), flags=re.I)
-                    if title.search(info['title']) and area.search(info['area']):
-                        posting['active'] = True
-
-    for posting in config.get('postings', []):
-        if not posting.get('active'):
+            if "Active" in info["status"]:
+                for posting in config.get("postings", []):
+                    title = re.compile(re.escape(posting.get("title")), flags=re.I)
+                    area = re.compile(posting.get("area", ""), flags=re.I)
+                    if title.search(info["title"]) and area.search(info["area"]):
+                        posting["active"] = True
+    for posting in config.get("postings", []):
+        if not posting.get("active"):
             expired.append(f'{posting.get("title")} ({posting.get("area")})')
-
     if expired:
-        notify(f'The following posts have expired:\n\n{chr(10).join(expired)}',
-               subject='Craigslist Expired Posts')
+        await notify(
+            f"The following posts have expired:\n\n{chr(10).join(expired)}",
+            subject="Craigslist Expired Posts",
+        )
 
-# renew posts
-def renew_posts():
-    # loop thru up to 5 pages
+
+async def renew_posts() -> None:
     for page in range(1, 6):
-        # look for all listings with a renew button
         while True:
             try:
-                # find next renew button element
-                button = driver.find_element(By.XPATH, '//input[@type="submit" and @value="renew"]')
-                # fetch posting link
-                form_action = button.find_element(By.XPATH, '..').get_attribute('action')
-                post_id = form_action.split('/')[-1]
-                link = driver.find_element(By.XPATH, f'//a[contains(@href, "/{post_id}.html")]')
-                title = link.text
-                url = link.get_attribute('href')
-                # click the renew button
-                button.click()
+                renew = await tab.select('input[type="submit"][value="renew"]')
+                
+                form_action = renew.parent.get("action")
+                post_id = renew.parent.parent.parent.get("data-postingid")
+                post_link = await tab.select(f'a[href*="/{post_id}.html"]')
+                post_title = " ".join(post_link.text.split())
+                post_url = post_link.get("href")
 
-                # check posting has been renewed
-                if has_posting_renewed():
-                    notify(f'Renewed "{title}" ({url})', sendmail=not config.get('no_success_mail'))
-                    # only renew the first posting unless config renew_all setting enabled
-                    if not config.get('renew_all'):
+                await renew.click()
+
+                if await has_posting_renewed():
+                    await notify(
+                        f'Renewed "{post_title}" ({post_url})',
+                        sendmail=not config.get("no_success_mail"),
+                    )
+
+                    if not config.get("renew_all"):
                         return
                 else:
-                    notify(f'Could not renew post - {form_action}', level='error')
+                    await notify(
+                        f"Could not renew post - {form_action}",
+                        level="error",
+                    )
                     return
 
-                # return to previous refreshed page
-                driver.back()
-                driver.refresh()
-
-            except NoSuchElementException:
+                await tab.back()
+                await tab.reload()
+            except asyncio.TimeoutError:
                 break
 
-        # go to next page if link found
         try:
-            driver.find_element(By.XPATH, f'//a[contains(@href, "filter_page={page + 1}")]').click()
-        except NoSuchElementException:
+            page_link = await tab.select(f'a[href*="filter_page={page + 1}"]')
+            await page_link.click()
+        except asyncio.TimeoutError:
             break
 
-# determine if posting has been renewed
-def has_posting_renewed():
+
+async def has_posting_renewed() -> bool:
     try:
-        driver.find_element(By.XPATH, '//*[contains(text(), "This posting has been renewed")]')
+        await tab.find("This posting has been renewed")
         return True
-    except NoSuchElementException:
+    except asyncio.TimeoutError:
         return False
 
-# print message in interactive mode or send email when run from cron
-def notify(message, subject=description, level='info', sendmail=True):
-    # log message
-    getattr(log, level)(f'{config["email"]}: {message}')
 
-    # send mail if sendmail parameter is true and config notify settings defined
-    if sendmail and config.get('notify'):
-        # set email content
-        email = MIMEText(message)
-        email['Subject'] = subject
-        email['To'] = config['notify']
-        if config.get('from'):
-            email['From'] = config['from']
+async def notify(
+    message: str,
+    subject: str = APP_DESCRIPTION,
+    level: Literal["debug", "info", "warning", "error", "critical"] = "info",
+    sendmail: bool = True,
+) -> None:
+    getattr(log, level)(
+        f'{config["email"]}: {message}' if config.get("email") else message
+    )
 
-        # send email via smtp server if config provided, otherwise via sendmail command
-        if config.get('smtp'):
-            # initialize smtp server object
-            server = SMTP(config['smtp'].get('server', 'localhost'))
-            # login smtp server if credentials provided
-            if config['smtp'].get('username') and config['smtp'].get('password'):
-                server.login(config['smtp']['username'], config['smtp']['password'])
-            # send email
-            server.sendmail(
-                config.get('from', 'craigslist-renew@localhost'),
-                config['notify'],
-                email.as_string())
-        else:
-            # initialize process object
-            process = Popen(['/usr/sbin/sendmail', '-t'], stdin=PIPE)
-            # send email
-            process.communicate(email.as_bytes())
+    if sendmail and config.get("notify") and config.get("smtp"):
+        email_to = config.get("notify")
+        if not isinstance(email_to, str):
+            log.error("'notify' config parameter must be string")
+            return
 
-# login and get active posts
-def login():
+        smtp = config.get("smtp")
+        if not isinstance(smtp, dict):
+            log.error("'smtp' config parameter must be map")
+            return
+
+        smtp_server = smtp.get("server")
+        if not isinstance(smtp_server, str):
+            log.error("'smtp.server' config parameter must be string")
+            return
+
+        email = EmailMessage()
+        email.set_content(message)
+        email["Subject"] = subject
+        email["To"] = email_to
+        email["From"] = config.get("from", "craigslist-renew@localhost")
+
+        hostname, _, port = smtp_server.partition(":")
+
+        await aiosmtplib.send(
+            email,
+            hostname=hostname,
+            port=int(port) if port and port.isdigit() else 25,
+            username=config["smtp"].get("username"),
+            password=config["smtp"].get("password"),
+        )
+
+
+async def login() -> Tab:
     try:
-        # open login url
-        driver.get(url)
-        # submit login credentials form
-        driver.find_element(By.XPATH, '//*[@id="inputEmailHandle"]').send_keys(config['email'])
-        driver.find_element(By.XPATH, '//*[@id="inputPassword"]').send_keys(config['password'])
-        driver.find_element(By.XPATH, '//*[@id="login"]').click()
+        tab = await browser.get(CRAIGSLIST_LOGIN_URL)
 
-        # exit if login failed
-        if driver.current_url != f'{url}/home':
-            sys.exit('Login failed')
+        email = config.get("email")
+        if not isinstance(email, str):
+            raise ValueError("'email' config parameter must be a string")
 
-        # filter active posts only
-        driver.find_element(By.XPATH, '//button[@class="filterbtn" and @value="active"]').click()
+        email_field = await tab.select("#inputEmailHandle")
+        await email_field.send_keys(email)
 
-    except NoSuchElementException:
-        sys.exit('Unexpected login page format')
-    except WebDriverException:
-        sys.exit('Could not open login page')
+        password = config.get("password")
+        if not isinstance(password, str):
+            raise ValueError("'password' config parameter must be a string")
 
-# logout to avoid dangling sessions
-def logout():
+        password_field = await tab.select("#inputPassword")
+        await password_field.send_keys(password)
+
+        submit = await tab.select("#login")
+        await submit.click()
+
+        await tab.wait_for_ready_state()
+
+        if tab.url != f"{CRAIGSLIST_LOGIN_URL}/home":
+            raise RuntimeError("Login failed")
+
+        active_button = await tab.select('button.filterbtn[value="active"]')
+        await active_button.click()
+
+        return tab
+    except asyncio.TimeoutError:
+        raise RuntimeError("Unexpected login page format")
+    except ProtocolException:
+        raise RuntimeError("Could not open login page")
+
+
+async def logout() -> None:
     try:
-        driver.find_element(By.LINK_TEXT, 'log out').click()
-    except (InvalidSessionIdException, NoSuchElementException):
+        if tab:
+            logout_link = await tab.select('a[href*="/logout"]')
+            await logout_link.click()
+    except asyncio.TimeoutError:
         pass
 
-# initialize logging
-def init_logging():
-    handlers = []
-    # add file logging, if specified in config
-    if config.get('logfile'):
-        handlers.append(logging.FileHandler(filename=config['logfile']))
-    # add console logging, if standard in connected to tty
+
+async def launch_browser() -> Browser:
+    browser_executable_path: str | None = None
+    if config.get("browser"):
+        if not isinstance(config["browser"], str):
+            raise ValueError("'browser' config parameter must be a string")
+        browser_executable_path = config["browser"]
+    elif config.get("webdriver"):
+        if not isinstance(config["webdriver"], str):
+            raise ValueError("'webdriver' config parameter must be a string")
+        if not config["webdriver"].startswith("http"):
+            browser_executable_path = config["webdriver"]
+
+    return await zd.start(
+        headless=True,
+        browser_executable_path=browser_executable_path,
+        browser_args=[
+            "--disable-dev-shm-usage",
+            "--disable-extensions",
+            "--window-size=1920,1080",
+        ],
+        sandbox=False,
+        user_agent=UserAgent().chrome,
+    )
+
+async def close_browser() -> None:
+    if browser:
+        await browser.stop()
+
+def init_logging() -> None:
+    handlers: list[logging.Handler] = []
+
+    if config.get("logfile"):
+        handlers.append(logging.FileHandler(filename=config["logfile"]))
+
     if sys.stdin.isatty():
         handlers.append(logging.StreamHandler(sys.stdout))
-    # set logging config
+
     logging.basicConfig(
-        format='[%(asctime)s] %(levelname)s %(message)s',
+        format="[%(asctime)s] %(levelname)s %(message)s",
         level=logging.INFO,
-        handlers=handlers)
+        handlers=handlers,
+    )
 
-# initialize webdriver session
-def init_webdriver():
-    options = webdriver.ChromeOptions()
-    options.add_argument('headless')
-    options.add_argument('disable-dev-shm-usage')
-    options.add_argument('disable-extensions')
-    options.add_argument('no-sandbox')
-    options.add_argument('window-size=1920,1080')
-    options.add_argument(f'user-agent={UserAgent().chrome}')
+    logging.getLogger("zendriver").setLevel(logging.WARNING)
 
-    if not config.get('webdriver'):
-        service = webdriver.ChromeService(
-            executable_path=shutil.which('chromedriver')
-        )
-        driver = webdriver.Chrome(
-            service=service,
-            options=options
-        )
-    elif not config['webdriver'].startswith('http'):
-        service = webdriver.ChromeService(
-            executable_path=config['webdriver']
-        )
-        driver = webdriver.Chrome(
-            service=service,
-            options=options
-        )
-    else:
-        driver = webdriver.Remote(
-            command_executor=config['webdriver'],
-            options=options
-        )
 
-    # set driver wait limit to 5 seconds
-    driver.implicitly_wait(5)
-
-    return driver
-
-# parse command line arguments
-def parse_args():
-    parser = ArgumentParser(description=description)
+def parse_args() -> Namespace:
+    parser = ArgumentParser(description=APP_DESCRIPTION)
     parser.add_argument(
-        '--expired', action='store_true', dest='check_expired', help='check expired posts')
+        "--expired",
+        action="store_true",
+        dest="check_expired",
+        help="check expired posts",
+    )
     parser.add_argument(
-        'config', type=FileType('r'), help='config file')
+        "config",
+        type=FileType("r"),
+        help="config file",
+    )
     return parser.parse_args()
 
-# cleanup session upon exit
-@atexit.register
-def cleanup_session():
-    try:
-        # log out to avoid dangling sessions
-        logout()
-        # terminate webdriver session
-        driver.quit()
-    except NameError:
-        pass
 
-# main
-def main():
-    global config, driver
+async def main() -> None:
+    global config, browser, tab
     try:
-        # parse command line arguments
         args = parse_args()
-        # load config file
         config = safe_load(args.config)
-        # initialize webdriver session
-        driver = init_webdriver()
-        # initialize logging
         init_logging()
-        # log in with email and password
-        login()
+        browser = await launch_browser()
+        tab = await login()
 
-        # check for expired posts if expired flag was specified, otherwise renew posts
         if args.check_expired:
-            check_expired()
+            await check_expired()
         else:
-            renew_posts()
+            await renew_posts()
 
-    except KeyError as e:
-        sys.exit(f'Parameter {e} not defined in config file')
-    except Exception as e:
-        log.error(f'Unexpected error: {e}')
-        sys.exit('Something went wrong. Please check the logs.')
-
-if __name__ == '__main__':
-    try:
-        main()
-    except SystemExit as e:
-        if not isinstance(e.code, str):
-            raise
-        notify(e.code, level='error')
+    except YAMLError as e:
+        await notify("Invalid config YAML format", level="error")
+        log.error(f"YAML error: {e}")
         sys.exit(1)
+    except RuntimeError as e:
+        await notify(str(e), level="error")
+        sys.exit(1)
+    except Exception as e:
+        await notify("Something went wrong. Please check the logs.", level="error")
+        log.error(f"Unexpected error: {e}")
+        sys.exit(1)
+    finally:
+        await logout()
+        await close_browser()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
