@@ -2,5 +2,6 @@ config.yml
 *.log
 
 .tool-versions
+.venv
 .vscode
 **.code-workspace

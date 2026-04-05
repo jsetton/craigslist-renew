@@ -1,5 +1,5 @@
-beautifulsoup4==4.12.2
-fake-useragent==1.2.1
-html5lib==1.1
-PyYAML==6.0.1
-selenium==4.12.0
+aiosmtplib==5.1.0
+beautifulsoup4==4.14.3
+fake-useragent==2.2.0
+PyYAML==6.0.3
+zendriver==0.15.3

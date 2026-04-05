@@ -4,17 +4,12 @@ This is a simple python script that will auto-renew all your active Craigslist p
 
 ## Requirements
 
-This project depends on the following python modules:
+Python 3.10 or higher is required.
 
-* `beautifulsoup4`
-* `html5lib`
-* `PyYAML`
-* `selenium`
-
-Use the python package manager to install them:
+Use the python package manager to install dependencies:
 
 ```
-pip3 install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ## Usage
@@ -27,10 +22,11 @@ Create a yaml config file with the following content:
 #
 email: <craigslist login>
 password: <craigslist password>
-notify: <comma separated list of emails>
 #
 # Optional parameters
 #
+# specify list of email recipients to notify
+notify: <comma separated list of emails>
 # specify sender email address
 from: <sender email address>
 # specify smtp server settings (defaults to using sendmail command if omitted)
@@ -45,8 +41,10 @@ no_success_mail: <1|0>
 renew_all: <1|0>
 # specify path for logging actions taken
 logfile: <path-to-logfile>
-# specify selenium webdriver local path or remote url (defaults to using chromedriver in local path if omitted)
-webdriver: <path-to-webdriver>
+# specify chrome-based browser executable path (optional, defaults to auto-detecting chromium)
+# when running in Docker, chromium is available at /usr/bin/chromium-browser
+# note: 'webdriver' parameter is also accepted for backward compatibility
+#browser: <path-to-browser>
 # specify the list of your current postings for expiration notifications
 postings:
   - title: My post
@@ -67,16 +65,14 @@ You can only renew a post so many times before it expires, so to get notified ab
 
 ## Docker Image
 
-[![dockeri.co](https://dockeri.co/image/jsetton/craigslist-renew)](https://hub.docker.com/r/jsetton/craigslist-renew).
+[![Docker Hub](https://img.shields.io/docker/pulls/jsetton/craigslist-renew)](https://hub.docker.com/r/jsetton/craigslist-renew)
 
 ### Supported tags
+| Tag | Description |
+| :---: | --- |
+| `latest` | Latest stable release |
 
-By default, the chromedriver package is included as local webdriver. If you rather use a [Selenium Grid](https://www.selenium.dev/docs/site/en/grid/) server instead, use the `remote` tag. If going with the latter, make sure to specify the remote url in the config file.
-
-|       Tags        | Description              |
-| :---------------: | ------------------------ |
-| `latest`, `local` | Local webdriver support  |
-|     `remote`      | Remote webdriver support |
+> **Note:** The `local` and `remote` tags are no longer supported. Please use `latest` instead.
 
 ### Run commands
 
