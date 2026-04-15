@@ -93,6 +93,7 @@ async def renew_posts() -> None:
                     return
 
                 await tab.back()
+                await tab.wait_for_ready_state()
                 await tab.reload()
             except asyncio.TimeoutError:
                 break
