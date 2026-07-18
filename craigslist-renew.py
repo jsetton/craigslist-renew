@@ -5,6 +5,11 @@
 # email: <craigslist login>
 # password: <craigslist password>
 # notify: <comma separated list of emails>
+# specify smtp server settings
+# smtp:
+#  server: <host:port>
+#  username: <mail username>
+#  password: <mail password>
 
 
 import asyncio
@@ -68,10 +73,13 @@ async def renew_posts() -> None:
         while True:
             try:
                 renew = await tab.select('input[type="submit"][value="renew"]')
-                
-                form_action = renew.parent.get("action")
-                post_id = renew.parent.parent.parent.get("data-postingid")
-                post_link = await tab.select(f'a[href*="/{post_id}.html"]')
+
+                row = renew
+                while row.tag != "tr":
+                    row = row.parent
+
+                post_action = renew.parent.get("action")
+                post_link = await row.query_selector("td.title a")
                 post_title = " ".join(post_link.text.split())
                 post_url = post_link.get("href")
 
@@ -87,7 +95,7 @@ async def renew_posts() -> None:
                         return
                 else:
                     await notify(
-                        f"Could not renew post - {form_action}",
+                        f"Could not renew post - {post_action}",
                         level="error",
                     )
                     return
@@ -123,7 +131,7 @@ async def notify(
         f'{config["email"]}: {message}' if config.get("email") else message
     )
 
-    if sendmail and config.get("notify") and config.get("smtp"):
+    if sendmail and all(param in config for param in ("notify", "smtp")):
         email_to = config.get("notify")
         if not isinstance(email_to, str):
             log.error("'notify' config parameter must be string")
@@ -151,8 +159,8 @@ async def notify(
             email,
             hostname=hostname,
             port=int(port) if port and port.isdigit() else 25,
-            username=config["smtp"].get("username"),
-            password=config["smtp"].get("password"),
+            username=smtp.get("username"),
+            password=smtp.get("password"),
         )
 
 

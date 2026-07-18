@@ -30,7 +30,7 @@ fi
 # Fix ownership of home directory if needed
 if [ -d "${CURRENT_HOME}" ] && \
    [ "$(stat -c %u:%g "${CURRENT_HOME}" 2>/dev/null)" != "${PUID}:${PGID}" ]; then
-    chown -R appuser:appuser /home/appuser
+    chown -R appuser:appuser "${CURRENT_HOME}"
 fi
 
 # Fix ownership of /data if needed (non-recursive)

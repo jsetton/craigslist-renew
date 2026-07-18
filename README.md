@@ -29,7 +29,7 @@ password: <craigslist password>
 notify: <comma separated list of emails>
 # specify sender email address
 from: <sender email address>
-# specify smtp server settings (defaults to using sendmail command if omitted)
+# specify smtp server settings
 smtp:
   server: <host:port>
   username: <mail username>
